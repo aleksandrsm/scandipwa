@@ -28,10 +28,10 @@ import { HistoryType, LocationType, MatchType } from 'Type/Common';
 import { isSignedIn } from 'Util/Auth';
 import { withReducers } from 'Util/DynamicReducer';
 import history from 'Util/History';
-import { appendWithStoreCode } from 'Util/Url';
+import { appendWithStoreCode, replace } from 'Util/Url';
 
 import MyAccount from './MyAccount.component';
-import { MY_ACCOUNT_URL } from './MyAccount.config';
+import { ACCOUNT_LOGIN_URL, MY_ACCOUNT_URL } from './MyAccount.config';
 
 export const BreadcrumbsDispatcher = import(
     /* webpackMode: "lazy", webpackChunkName: "dispatchers" */
@@ -48,7 +48,8 @@ export const mapStateToProps = (state) => ({
     isWishlistEnabled: state.ConfigReducer.wishlist_general_active,
     wishlistItems: state.WishlistReducer.productsInWishlist,
     isSignedIn: state.MyAccountReducer.isSignedIn,
-    newsletterActive: state.ConfigReducer.newsletter_general_active
+    newsletterActive: state.ConfigReducer.newsletter_general_active,
+    baseLinkUrl: state.ConfigReducer.base_link_url
 });
 
 /** @namespace Route/MyAccount/Container/mapDispatchToProps */
@@ -79,7 +80,8 @@ export class MyAccountContainer extends PureComponent {
         wishlistItems: PropTypes.object,
         newsletterActive: PropTypes.bool.isRequired,
         isWishlistEnabled: PropTypes.bool.isRequired,
-        isSignedIn: PropTypes.bool.isRequired
+        isSignedIn: PropTypes.bool.isRequired,
+        baseLinkUrl: PropTypes.string.isRequired
     };
 
     static defaultProps = {
@@ -129,6 +131,7 @@ export class MyAccountContainer extends PureComponent {
     static navigateToSelectedTab(props, state = {}) {
         const {
             history,
+            isSignedIn,
             match: {
                 params: {
                     tab: historyActiveTab
@@ -143,7 +146,7 @@ export class MyAccountContainer extends PureComponent {
             ? historyActiveTab
             : DASHBOARD;
 
-        if (historyActiveTab !== newActiveTab) {
+        if (historyActiveTab !== newActiveTab && isSignedIn) {
             history.push(appendWithStoreCode(`${ MY_ACCOUNT_URL }/${ newActiveTab }`));
         }
 
@@ -198,10 +201,12 @@ export class MyAccountContainer extends PureComponent {
             wishlistItems: prevWishlistItems,
             isSignedIn: prevIsSignedIn
         } = prevProps;
+
         const {
             wishlistItems,
             isSignedIn: currIsSignedIn
         } = this.props;
+
         const { activeTab: prevActiveTab } = prevState;
         const { activeTab } = this.state;
 
@@ -233,6 +238,19 @@ export class MyAccountContainer extends PureComponent {
             isEditingActive,
             subHeading: this.getSubHeading()
         };
+    }
+
+    isTabEnabled(tabName) {
+        const { isWishlistEnabled, newsletterActive } = this.props;
+
+        switch (tabName) {
+        case MY_WISHLIST:
+            return isWishlistEnabled;
+        case NEWSLETTER_SUBSCRIPTION:
+            return newsletterActive;
+        default:
+            return true;
+        }
     }
 
     _getWishlistItemsCount() {
@@ -269,7 +287,7 @@ export class MyAccountContainer extends PureComponent {
 
     tabsFilterEnabled() {
         return Object.fromEntries(Object.entries(MyAccountContainer.tabMap)
-            .filter(([k]) => MyAccountContainer.isTabEnabled(this.props, k)));
+            .filter(([tabName]) => this.isTabEnabled(this.props, tabName)));
     }
 
     onSignOut() {
@@ -359,7 +377,8 @@ export class MyAccountContainer extends PureComponent {
         const {
             history,
             location: { pathname },
-            isMobile
+            isMobile,
+            baseLinkUrl
         } = this.props;
 
         if (isSignedIn()) { // do nothing for signed-in users
@@ -376,7 +395,11 @@ export class MyAccountContainer extends PureComponent {
             return;
         }
 
-        history.push({ pathname: appendWithStoreCode('/') });
+        const path = baseLinkUrl
+            ? appendWithStoreCode(ACCOUNT_LOGIN_URL)
+            : replace(/\/my-account\/.*/, ACCOUNT_LOGIN_URL);
+
+        history.push({ pathname: path });
     }
 
     render() {
